@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+    app:
+        image: 28062001/whatsapp-laravel-app
+        depends_on:
+            - chrome
+            - selenium-router
+
+    chrome-init:
+        image: busybox
+        volumes:
+            - ./chrome_data:/tmp/chrome_data
+        command: rm -f /tmp/chrome_data/SingletonLock
+        restart: "no"
+        networks:
+            - app-network
+
+    chrome:
+        image: selenium/node-chrome:4
+        shm_size: 2gb
+        depends_on:
+            - chrome-init
+            - selenium-router
+        environment:
+            - SE_EVENT_BUS_HOST=selenium-hub
+            - SE_EVENT_BUS_PUBLISH_PORT=4442
+            - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+            - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+            - SE_NODE_MAX_SESSIONS=8
+            - SE_NODE_SESSION_TIMEOUT=90
+            - SE_NODE_GRID_URL=http://localhost:4444
+            - VNC_NO_PASSWORD=1
+            - GRID_TIMEOUT=100
+        volumes:
+            - ./chrome_data:/tmp/chrome_data
+            - /c/Users/38096/AppData/Local/Google/Chrome/User Data/Profile 7:/tmp/chrome_data/Profile 1
+        ports:
+            - "6900:5900"
+        healthcheck:
+            test: ["CMD-SHELL", "curl -f http://localhost:4444 || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - app-network
+
+    selenium-router:
+        image: selenium/hub:4
+        container_name: selenium-hub
+        ports:
+            - "4442:4442"
+            - "4443:4443"
+            - "4444:4444"
+        healthcheck:
+            test: ["CMD-SHELL", "curl -f http://localhost:4444/grid/api/proxy || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+        networks:
+            - app-network
+
+networks:
+    app-network:
+        driver: bridge
